@@ -1,0 +1,8 @@
+; @generated
+; Editing this manually is not recommended, run "make import" instead!
+    .export _ASSET__font__bios8_bmp_ptr
+
+    .segment "font"
+
+_ASSET__font__bios8_bmp_ptr:
+    .incbin "build/assets/font/bios8.gtg.deflate"

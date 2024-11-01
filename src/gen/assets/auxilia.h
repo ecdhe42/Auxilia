@@ -1,0 +1,23 @@
+//@generated
+//Editing this manually is not recommended, run "make import" instead!
+#ifndef ASSETS__auxilia_H
+#define ASSETS__auxilia_H
+
+#define BANK_auxilia 129
+
+extern const unsigned char* ASSET__auxilia__font_bmp_ptr;
+#define ASSET__auxilia__font_bmp_bank 129
+#define ASSET__auxilia__font_bmp ASSET__auxilia__font_bmp_ptr,ASSET__auxilia__font_bmp_bank
+extern const unsigned char* ASSET__auxilia__splash_bmp_ptr;
+#define ASSET__auxilia__splash_bmp_bank 129
+#define ASSET__auxilia__splash_bmp ASSET__auxilia__splash_bmp_ptr,ASSET__auxilia__splash_bmp_bank
+extern const unsigned char* ASSET__auxilia__sprites_bmp_ptr;
+#define ASSET__auxilia__sprites_bmp_bank 129
+#define ASSET__auxilia__sprites_bmp ASSET__auxilia__sprites_bmp_ptr,ASSET__auxilia__sprites_bmp_bank
+extern const unsigned char* ASSET__auxilia__tileset_bmp_ptr;
+#define ASSET__auxilia__tileset_bmp_bank 129
+#define ASSET__auxilia__tileset_bmp ASSET__auxilia__tileset_bmp_ptr,ASSET__auxilia__tileset_bmp_bank
+extern const unsigned char* ASSET__auxilia__tileset_city_bmp_ptr;
+#define ASSET__auxilia__tileset_city_bmp_bank 129
+#define ASSET__auxilia__tileset_city_bmp ASSET__auxilia__tileset_city_bmp_ptr,ASSET__auxilia__tileset_city_bmp_bank
+#endif

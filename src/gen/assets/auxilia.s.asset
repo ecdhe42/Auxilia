@@ -1,0 +1,24 @@
+; @generated
+; Editing this manually is not recommended, run "make import" instead!
+    .export _ASSET__auxilia__font_bmp_ptr
+    .export _ASSET__auxilia__splash_bmp_ptr
+    .export _ASSET__auxilia__sprites_bmp_ptr
+    .export _ASSET__auxilia__tileset_bmp_ptr
+    .export _ASSET__auxilia__tileset_city_bmp_ptr
+
+    .segment "auxilia"
+
+_ASSET__auxilia__font_bmp_ptr:
+    .incbin "build/assets/auxilia/font.gtg.deflate"
+
+_ASSET__auxilia__splash_bmp_ptr:
+    .incbin "build/assets/auxilia/splash.gtg.deflate"
+
+_ASSET__auxilia__sprites_bmp_ptr:
+    .incbin "build/assets/auxilia/sprites.gtg.deflate"
+
+_ASSET__auxilia__tileset_bmp_ptr:
+    .incbin "build/assets/auxilia/tileset.gtg.deflate"
+
+_ASSET__auxilia__tileset_city_bmp_ptr:
+    .incbin "build/assets/auxilia/tileset_city.gtg.deflate"

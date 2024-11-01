@@ -1,0 +1,6 @@
+.vscode
+*.gtr
+build
+*.png
+*.jpeg
+src/gen/*
