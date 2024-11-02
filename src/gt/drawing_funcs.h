@@ -73,11 +73,11 @@ void prepare_sprite_mode(char ramBank);
 void prepare_box_mode();
 
 #define draw_sprite_now( x,  y,  w,  h,  gx,  gy,  ramBank) \
-    flagsMirror |= DMA_ENABLE | DMA_OPAQUE | DMA_IRQ; \
+    flagsMirror |= DMA_ENABLE | DMA_OPAQUE | DMA_IRQ | DMA_GCARRY ; \
     flagsMirror &= ~(DMA_COLORFILL_ENABLE | DMA_OPAQUE); \
     *dma_flags = flagsMirror; \
     banksMirror &= BANK_RAM_MASK & ~BANK_SECOND_FRAMEBUFFER; \
-    banksMirror |= frameflip | ramBank; \
+    banksMirror |= bankflip | ramBank; \
     *bank_reg = banksMirror; \
     await_drawing(); \
     vram[VX] = x; \

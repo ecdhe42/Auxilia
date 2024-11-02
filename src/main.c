@@ -5,7 +5,15 @@
 #include "music.h"
 #include "banking.h"
 #include "gen/assets/auxilia.h"
+#include "gen/assets/auxilia0.h"
 #include "gen/assets/sfx.h"
+
+#define WORLD_TILESET_BANK  0
+#define SPRITES_BANK        1
+#define SPLASH_BANK         2
+#define CITY_TILESET_BANK   3
+#define FONTS_BANK          4
+#define ARMORS_F_BANK       5
 
 #pragma data-name (push, "SAVE")
 #pragma data-name (pop)
@@ -108,8 +116,8 @@ struct Map {
 };
 
 const struct Map maps[2] = {
-    {7096, 0, world_tileset_property},
-    {7067, 3, city_tileset_property}
+    {7096, WORLD_TILESET_BANK, world_tileset_property},
+    {7067, CITY_TILESET_BANK, city_tileset_property}
 };
 
 struct TileVisibility {
@@ -242,18 +250,27 @@ void set_visible_tiles() {
     }
 }
 
-#define draw_first_tile(x, y, gx, gy) \
+#define draw_tile_init(w, h, ramBank) \
+    flagsMirror |= DMA_ENABLE | DMA_OPAQUE | DMA_IRQ | DMA_GCARRY; \
+    flagsMirror &= ~(DMA_COLORFILL_ENABLE | DMA_OPAQUE); \
+    *dma_flags = flagsMirror; \
+    banksMirror &= BANK_RAM_MASK & ~BANK_SECOND_FRAMEBUFFER; \
+    banksMirror |= bankflip | ramBank; \
+    *bank_reg = banksMirror; \
+    await_drawing(); \
+    vram[WIDTH] = w; \
+    vram[HEIGHT] = h;
+
+#define draw_left_tile(x, y, gx,  gy) \
     await_drawing(); \
     vram[VX] = x; \
     vram[VY] = y; \
     vram[GX] = gx; \
     vram[GY] = gy; \
-    vram[WIDTH] = 16;   \
-    vram[HEIGHT] = 16;  \
     draw_busy = 1; \
     vram[START] = 1;
 
-#define draw_tile(x, gx,  gy) \
+#define draw_next_tile(x, gx,  gy) \
     await_drawing(); \
     vram[VX] = x; \
     vram[GX] = gx; \
@@ -261,13 +278,17 @@ void set_visible_tiles() {
     draw_busy = 1; \
     vram[START] = 1;
 
+#include "misc.h"
+
+/*
+#pragma code-name(push, "PROG4")
 void splash() {
-    draw_sprite(0, 0, 127, 127, 0, 0, 2);
+    draw_sprite(0, 0, 127, 127, 0, 0, SPLASH_BANK);
     while (1) {
         clear_screen(0);
         clear_border(0);
         rand();
-        draw_sprite(0, 0, 127, 127, 0, 0, 2);
+        draw_sprite(0, 0, 127, 127, 0, 0, SPLASH_BANK);
         await_draw_queue();
         sleep(1);
         flip_pages();
@@ -331,6 +352,7 @@ void preamble() {
     while (1) {
         clear_screen(0);
         clear_border(0);
+        await_draw_queue();
 
         tmp_y = 0;
 
@@ -341,31 +363,31 @@ void preamble() {
             while (tmp) {
                 if (tmp >= 'a' && tmp <= 'z') {
                     tmp2 = (tmp - 'a') << 2;
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 61, 4);
-                } else if (tmp >= 'A' && tmp <= 'M') {
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 61, FONTS_BANK);
+                } else if (tmp >= 'A' && tmp <= 'N') {
                     tmp2 = (tmp - 'A') * 9;
-                    draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 22, 4);
+                    draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 22, FONTS_BANK);
                     tmp_x += 5;
                     tmp_y += 6;
                 } else if (tmp >= 'O' && tmp <= 'Z') {
                     tmp2 = (tmp - 'O') * 9;
-                    draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 33, 4);
+                    draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 33, FONTS_BANK);
                     tmp_x += 5;
                     tmp_y += 6;
                 } else if (tmp == ',') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 108, 61, 4);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 108, 61, FONTS_BANK);
                 } else if (tmp == '.') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 104, 61, 4);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 104, 61, FONTS_BANK);
                 } else if (tmp == '\'') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 116, 61, 4);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 116, 61, FONTS_BANK);
                 } else if (tmp == '"') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 112, 61, 4);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 112, 61, FONTS_BANK);
                 } else if (tmp == '-') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 120, 61, 4);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 120, 61, FONTS_BANK);
                 } else if (tmp == '!') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 124, 61, 4);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 124, 61, FONTS_BANK);
                 } else if (tmp == '_') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 0, 66, 4);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 0, 66, FONTS_BANK);
                 }
                 tmp_x += 5;
                 tilemap_ptr++;
@@ -375,7 +397,7 @@ void preamble() {
             tmp_y += 6;
         }
 
-        await_draw_queue();
+        await_drawing();
         sleep(1);
         flip_pages();
 
@@ -394,40 +416,176 @@ void preamble() {
     }    
 }
 
-int main () {
-    load_spritesheet((char*)&ASSET__auxilia__tileset_bmp, 0);
-    load_spritesheet((char*)&ASSET__auxilia__sprites_bmp, 1);
-    load_spritesheet((char*)&ASSET__auxilia__splash_bmp, 2);
-    load_spritesheet((char*)&ASSET__auxilia__tileset_city_bmp, 3);
-    load_spritesheet((char*)&ASSET__auxilia__font_bmp, 4);
+const char *armors_female_name[5] = {
+    "Leather",
+    "Studded leather",
+    "Reinforced",
+    "Metal",
+    "Full plate"
+};
 
+const char *armors_female_desc[5] = {
+    "50 coin\0\0The basic armor.",
+    "200 coin\0\0Reinforced for enhanced\0protection.",
+    "500 coin\0\0A solid armor which\0can sustain severe\0blows.",
+    "1000 coin\0\0Believe or not\0the high heels allow\0you to outrun dinosaurs.",
+    "2000 coin\0\0Nobody knows why\0but this armor offers\0the best protection."
+};
+
+void display_armor_names() {
+    tmp_x = 2;
+    tmp_y = 5;
+    for (tmp3=0; tmp3<5; tmp3++) {
+        tilemap_ptr = armors_female_name[tmp3];
+        tmp = tilemap_ptr[0];
+
+        while (tmp != 0) {
+            if (tmp >= 'a' && tmp <= 'z') {
+                tmp2 = (tmp - 'a') << 2;
+                draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 61, FONTS_BANK);
+            } else if (tmp >= 'A' && tmp <= 'N') {
+                tmp2 = (tmp - 'A') * 9;
+                draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 22, FONTS_BANK);
+                tmp_x += 5;
+                tmp_y += 6;
+            } else if (tmp >= 'O' && tmp <= 'Z') {
+                tmp2 = (tmp - 'O') * 9;
+                draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 33, FONTS_BANK);
+                tmp_x += 5;
+                tmp_y += 6;
+            }
+            tilemap_ptr++;
+            tmp_x += 5;
+            tmp = tilemap_ptr[0];
+        }
+        tmp_x = 2;
+        tmp_y += 6;
+    }
+    await_drawing();
+}
+
+void display_armor(unsigned char idx) {
+    if (idx < 3) {
+        tmp_x = idx*42;
+        tmp_y = 0;
+    } else {
+        tmp_x = (idx-3)*42;
+        tmp_y = 64;
+    }
+    
+    draw_sprite_now(85, 10, 42, 64, tmp_x, tmp_y, ARMORS_F_BANK);
+    await_drawing();
+
+    tilemap_ptr = armors_female_desc[idx];
+    tmp_x = 2;
+    tmp_y = 80;
+    tmp = tilemap_ptr[0];
+    while (tmp != '.') {
+        if (tmp == 0) {
+            tmp_x = -3;
+            tmp_y += 6;
+        } else if (tmp >= 'a' && tmp <= 'z') {
+            tmp2 = (tmp - 'a') << 2;
+            draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 61, FONTS_BANK);
+        } else if (tmp >= 'A' && tmp <= 'N') {
+            tmp2 = (tmp - 'A') * 9;
+            draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 22, FONTS_BANK);
+            tmp_x += 5;
+            tmp_y += 6;
+        } else if (tmp >= 'O' && tmp <= 'Z') {
+            tmp2 = (tmp - 'O') * 9;
+            draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 33, FONTS_BANK);
+            tmp_x += 5;
+            tmp_y += 6;
+        } else if (tmp >= '0' && tmp <= '9') {
+            tmp2 = (tmp - '0') << 2;
+            draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 67, FONTS_BANK);
+        }
+        
+        tmp_x += 5;
+        //tmp_y += 6;
+
+        tilemap_ptr++;
+        tmp = tilemap_ptr[0];
+    }
+    await_drawing();
+
+}
+
+void shop_armors() {
+    tile_val = 0;
+
+    while (1) {
+        clear_screen(0);
+        clear_border(0);
+        await_draw_queue();
+
+        draw_box_now(1, 12*tile_val+5, 1, 12, 30);
+        await_drawing();
+
+        display_armor_names();
+        display_armor(tile_val);
+        sleep(1);
+        flip_pages();
+
+        update_inputs();
+        if (player1_buttons & ~player1_old_buttons& INPUT_MASK_UP) {
+            if (tile_val != 0) {
+                tile_val--;
+            }
+        } else if (player1_buttons & ~player1_old_buttons & INPUT_MASK_DOWN) {
+            if (tile_val != 4) {
+                tile_val++;
+            }
+        }
+    }
+}
+
+#pragma code-name (pop)
+*/
+
+void interact() {
+    change_rom_bank(0xF9);
+    shop_armors();
+    change_rom_bank(0xFB);
+}
+
+int main () {
     seed = 42;
     player_x = -8;
     player_y = 0;
     player_dir = 0;
     player_step = 0;
-    tile_bank = 0;
+    tile_bank = WORLD_TILESET_BANK;
+    for (tmp=0; tmp<63; tmp++) {
+        visible[tmp] = 0;
+    }
 
     init_graphics();
     init_dynawave();
     init_music();
 
-    flip_pages();
+    load_spritesheet((char*)&ASSET__auxilia__tileset_bmp, WORLD_TILESET_BANK);
+    load_spritesheet((char*)&ASSET__auxilia__sprites_bmp, SPRITES_BANK);
+    load_spritesheet((char*)&ASSET__auxilia0__splash_bmp, SPLASH_BANK);
+    load_spritesheet((char*)&ASSET__auxilia__tileset_city_bmp, CITY_TILESET_BANK);
+    load_spritesheet((char*)&ASSET__auxilia__font_bmp, FONTS_BANK);
+    load_spritesheet((char*)&ASSET__auxilia__armorsf_bmp, ARMORS_F_BANK);
+
     clear_border(0);
     await_draw_queue();
     flip_pages();
     await_draw_queue();
     clear_border(0);
+    await_draw_queue();
 
-    *dma_flags = DMA_NMI | DMA_ENABLE | DMA_IRQ | DMA_OPAQUE | DMA_GCARRY;
+    flagsMirror = DMA_NMI | DMA_ENABLE | DMA_IRQ | DMA_OPAQUE | DMA_GCARRY;
+    *dma_flags = flagsMirror;
 
+    change_rom_bank(0xF9);
+//    shop_armors();
     splash();
-
     preamble();
-
-    for (tmp=0; tmp<63; tmp++) {
-        visible[tmp] = 0;
-    }
 
     change_rom_bank(0xFB);
     set_map(0);
@@ -435,6 +593,7 @@ int main () {
     while (1) {                                     //  Run forever
         clear_screen(0);
         clear_border(0);
+        await_draw_queue();
 
         // Draw the playfield
         rect.x=-8;rect.y=player_y;
@@ -448,154 +607,75 @@ int main () {
         tmp_y = 0;
 
         //*bank_reg = BANK_CLIP_X | BANK_CLIP_Y;
+        draw_tile_init(16, 16, tile_bank | BANK_CLIP_X);
 
-/*
-        draw_first_tile(-8, 0, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1);
-        tmp_x=-8; tmp_y += 16; tilemap_ptr2 ++; tmp = *tilemap_ptr2;
-        draw_first_tile(-8, tmp_y, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1);
-        tmp_x=-8; tmp_y += 16; tilemap_ptr2 ++; tmp = *tilemap_ptr2;
-        draw_first_tile(-8, tmp_y, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1);
-        tmp_x=-8; tmp_y += 16; tilemap_ptr2 ++; tmp = *tilemap_ptr2;
-        draw_first_tile(-8, tmp_y, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1);
-        tmp_x=-8; tmp_y += 16; tilemap_ptr2 ++; tmp = *tilemap_ptr2;
-        draw_first_tile(-8, tmp_y, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1);
-        tmp_x=-8; tmp_y += 16; tilemap_ptr2 ++; tmp = *tilemap_ptr2;
-        draw_first_tile(-8, tmp_y, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1);
-        tmp_x=-8; tmp_y += 16; tilemap_ptr2 ++; tmp = *tilemap_ptr2;
-        draw_first_tile(-8, tmp_y, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
-        draw_tile(tmp_x, (tmp & 0x7) << 4, (tmp & 0xF8) << 1);
-*/
-//        draw_sprite_now(10, 10, 16, 16, 0, 0, 0);
+        draw_left_tile(-8, 0, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2 ++; tmp = *tilemap_ptr2;
+        draw_left_tile(-8, 16, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2 ++; tmp = *tilemap_ptr2;
+        draw_left_tile(-8, 32, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2 ++; tmp = *tilemap_ptr2;
+        draw_left_tile(-8, 48, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2 ++; tmp = *tilemap_ptr2;
+        draw_left_tile(-8, 64, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2 ++; tmp = *tilemap_ptr2;
+        draw_left_tile(-8, 80, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2 ++; tmp = *tilemap_ptr2;
+        draw_left_tile(-8, 96, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tilemap_ptr2++; tmp = *tilemap_ptr2;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1);
+        await_drawing();
 
-
-        tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect();
-        rect.x = player_x; rect.y += 16; tilemap_ptr2 ++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect();
-        rect.x = player_x; rect.y += 16; tilemap_ptr2 ++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect();
-        rect.x = player_x; rect.y += 16; tilemap_ptr2 ++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect();
-        rect.x = player_x; rect.y += 16; tilemap_ptr2 ++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect();
-        rect.x = player_x; rect.y += 16; tilemap_ptr2 ++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect();
-        rect.x = player_x; rect.y += 16; tilemap_ptr2 ++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect(); rect.x += 16; tilemap_ptr2++; tmp = *tilemap_ptr2; tmp_x = (tmp & 0x7) << 4; tmp_y = (tmp & 0xF8) << 1;
-        rect.gx=tmp_x;rect.gy=tmp_y;draw_sprite_rect();
-
-        draw_sprite(56, 48, 16, 16, 0, 0, 1);
-
+        draw_sprite(56, 48, 16, 16, 0, 0, SPRITES_BANK);
+        draw_sprite(0, 112, 96, 16, 0, 112, SPRITES_BANK);
         await_draw_queue();
 
         PROFILER_END(0);
@@ -607,6 +687,9 @@ int main () {
             player_step--;
         } else {
             update_inputs();
+            if ((player1_buttons & ~player1_old_buttons & INPUT_MASK_A)) {
+                interact();
+            } else {
             if((player1_buttons & INPUT_MASK_LEFT)) {
                 tilemap_ptr2 = player_ptr-1;
                 tmp = *tilemap_ptr2;
@@ -644,6 +727,7 @@ int main () {
                     tilemap_ptr += 128;
                     player_ptr += 128;
                 }
+            }
             }
         }
         set_visible_tiles();
