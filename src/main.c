@@ -8,12 +8,16 @@
 #include "gen/assets/auxilia0.h"
 #include "gen/assets/sfx.h"
 
-#define WORLD_TILESET_BANK  0
-#define SPRITES_BANK        1
-#define SPLASH_BANK         2
-#define CITY_TILESET_BANK   3
-#define FONTS_BANK          4
-#define ARMORS_F_BANK       5
+#define VRAM_WORLD_TILESET_BANK  0
+#define VRAM_SPRITES_BANK        1
+#define VRAM_SPLASH_BANK         2
+#define VRAM_CITY_TILESET_BANK   3
+#define VRAM_FONTS_BANK          4
+#define VRAM_ARMORS_F_BANK       5
+
+#define WORLD_TILEMAP_BANK  0xFB
+#define CITY_TILEMAP_BANK   0xFA
+#define MISC_CODE_BANK      0xF9
 
 #pragma data-name (push, "SAVE")
 #pragma data-name (pop)
@@ -40,6 +44,7 @@ unsigned char buffer1[9];
 unsigned char visible[63];
 unsigned char buffer2[9];
 unsigned char tile_bank;
+unsigned char map;
 
 #pragma bss-name (pop)
 
@@ -55,7 +60,8 @@ unsigned char padding[8] = { 0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55 };
 /*
 Bit 0 (1): can pass through
 Bit 1 (2): can see through
-Bit 2 (4): special action
+Bit 2 (4): actionable
+Bit 3 (8): automatic action
 */
 const unsigned char world_tileset_property[64] = {
   3,  3,  3,  3,  1,  1,  1,  6,
@@ -76,7 +82,7 @@ const unsigned char city_tileset_property[64] = {
   3,  3,  3,  3,  0,  2,  2,  2,
   2,  2,  3,  3,  3,  2,  2,  2,
   2,  2,  3,  3,  0,  2,  3,  3,
-  2,  2,  3,  3,  3,  3,  3,  3
+  2,  2,  3,  3,  3,  3,  3,  11
 };
 
 unsigned char tileset_property[64];
@@ -116,8 +122,8 @@ struct Map {
 };
 
 const struct Map maps[2] = {
-    {7096, WORLD_TILESET_BANK, world_tileset_property},
-    {7067, CITY_TILESET_BANK, city_tileset_property}
+    {7096, VRAM_WORLD_TILESET_BANK, world_tileset_property},
+    {7067, VRAM_CITY_TILESET_BANK, city_tileset_property}
 };
 
 struct TileVisibility {
@@ -211,6 +217,7 @@ void hit();
 
 void set_map(unsigned char map_idx) {
     struct Map *map = (struct Map *)&maps[map_idx];
+    map = map_idx;
     tilemap_ptr = (unsigned char *)&tilemap0[map->entry_offset];
     tilemap_ptr2 = tilemap_ptr;
     player_ptr = (unsigned char *)&tilemap0[map->entry_offset+128*3+4];
@@ -229,7 +236,6 @@ void set_visible_tiles() {
         long_tmp = tilemap_scan[tmp];
         visible[tmp2] = tilemap_ptr[long_tmp];
     }
-
     for (tmp=1; tmp<35; tmp++) {
         tmp2 = visibility_scan[tmp];
         long_tmp = tilemap_scan[tmp];
@@ -280,297 +286,48 @@ void set_visible_tiles() {
 
 #include "misc.h"
 
-/*
-#pragma code-name(push, "PROG4")
-void splash() {
-    draw_sprite(0, 0, 127, 127, 0, 0, SPLASH_BANK);
-    while (1) {
-        clear_screen(0);
-        clear_border(0);
-        rand();
-        draw_sprite(0, 0, 127, 127, 0, 0, SPLASH_BANK);
-        await_draw_queue();
-        sleep(1);
-        flip_pages();
-
-        update_inputs();
-        if (player1_buttons) break;
+void interact(unsigned char tile) {
+    if (map == 0) {
+        change_rom_bank(CITY_TILEMAP_BANK);
+        set_map(1);
+        return;
+    }
+    // We leave the city
+    if (tile == 63) {
+        change_rom_bank(WORLD_TILEMAP_BANK);
+        set_map(0);
+        return;
     }
 
-    while (1) {
-        update_inputs();
-        if (!player1_buttons) break;
-    }
+//    change_rom_bank(0xF9);
+//    shop_armors();
+//    change_rom_bank(0xFB);
 }
 
-const char *preamble_text[40] = {
-    "_______________________",
-    "An evil wizard is",
-    "threatening the land of",
-    "continentalia, sending",
-    "hordes of monsters who",
-    "will happily die for him,",
-    "even when sent on suicide",
-    "missions. the wizard is",
-    "pure evil, so the only ",
-    "course of action is the",
-    "so-called \"beat-the-",
-    "stuffing-outta-him\" ",
-    "diplomacy. except he's",
-    "powerful af.",
-    "",
-    "There is however a",
-    "prophecy about a magical",
-    "artifact that could beat",
-    "him, but it's super hard",
-    "to get. as if someone",
-    "placed it in the least",
-    "convenient location on",
-    "purpose.",
-    "",
-    "Instead of sending his",
-    "army's best elements on",
-    "this dangerous quest, the",
-    "ruler of the land, lord",
-    "continental, prefers to",
-    "rely on an inexperienced",
-    "rando. this is absolutely",
-    "not because he's afraid",
-    "his population would",
-    "overthrow him should he",
-    "deplete the army keeping",
-    "people in check.",
-    "",
-    "Congratulations hero!",
-    "yes, you. no backsies.",
-    ""
-};
-
-void preamble() {
-    tile_val=0;
-
-    while (1) {
-        clear_screen(0);
-        clear_border(0);
-        await_draw_queue();
-
-        tmp_y = 0;
-
-        for (tmp3=0; tmp3<20; tmp3++) {
-            tmp_x = 2;
-            tilemap_ptr = (unsigned char*)preamble_text[tmp3+tile_val];
-            tmp = tilemap_ptr[0];
-            while (tmp) {
-                if (tmp >= 'a' && tmp <= 'z') {
-                    tmp2 = (tmp - 'a') << 2;
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 61, FONTS_BANK);
-                } else if (tmp >= 'A' && tmp <= 'N') {
-                    tmp2 = (tmp - 'A') * 9;
-                    draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 22, FONTS_BANK);
-                    tmp_x += 5;
-                    tmp_y += 6;
-                } else if (tmp >= 'O' && tmp <= 'Z') {
-                    tmp2 = (tmp - 'O') * 9;
-                    draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 33, FONTS_BANK);
-                    tmp_x += 5;
-                    tmp_y += 6;
-                } else if (tmp == ',') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 108, 61, FONTS_BANK);
-                } else if (tmp == '.') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 104, 61, FONTS_BANK);
-                } else if (tmp == '\'') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 116, 61, FONTS_BANK);
-                } else if (tmp == '"') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 112, 61, FONTS_BANK);
-                } else if (tmp == '-') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 120, 61, FONTS_BANK);
-                } else if (tmp == '!') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 124, 61, FONTS_BANK);
-                } else if (tmp == '_') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 0, 66, FONTS_BANK);
-                }
-                tmp_x += 5;
-                tilemap_ptr++;
-                tmp = tilemap_ptr[0];
-            }
-            tilemap_ptr++;
-            tmp_y += 6;
-        }
-
-        await_drawing();
-        sleep(1);
-        flip_pages();
-
-        update_inputs();
-        if (player1_buttons & INPUT_MASK_UP) {
-            if (tile_val != 0) {
-                tile_val--;
-            }
-        } else if (player1_buttons & INPUT_MASK_DOWN) {
-            if (tile_val != 20) {
-                tile_val++;
-            }
-        }
-
-        if (player1_buttons & INPUT_MASK_A) break;
-    }    
-}
-
-const char *armors_female_name[5] = {
-    "Leather",
-    "Studded leather",
-    "Reinforced",
-    "Metal",
-    "Full plate"
-};
-
-const char *armors_female_desc[5] = {
-    "50 coin\0\0The basic armor.",
-    "200 coin\0\0Reinforced for enhanced\0protection.",
-    "500 coin\0\0A solid armor which\0can sustain severe\0blows.",
-    "1000 coin\0\0Believe or not\0the high heels allow\0you to outrun dinosaurs.",
-    "2000 coin\0\0Nobody knows why\0but this armor offers\0the best protection."
-};
-
-void display_armor_names() {
-    tmp_x = 2;
-    tmp_y = 5;
-    for (tmp3=0; tmp3<5; tmp3++) {
-        tilemap_ptr = armors_female_name[tmp3];
-        tmp = tilemap_ptr[0];
-
-        while (tmp != 0) {
-            if (tmp >= 'a' && tmp <= 'z') {
-                tmp2 = (tmp - 'a') << 2;
-                draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 61, FONTS_BANK);
-            } else if (tmp >= 'A' && tmp <= 'N') {
-                tmp2 = (tmp - 'A') * 9;
-                draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 22, FONTS_BANK);
-                tmp_x += 5;
-                tmp_y += 6;
-            } else if (tmp >= 'O' && tmp <= 'Z') {
-                tmp2 = (tmp - 'O') * 9;
-                draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 33, FONTS_BANK);
-                tmp_x += 5;
-                tmp_y += 6;
-            }
-            tilemap_ptr++;
-            tmp_x += 5;
-            tmp = tilemap_ptr[0];
-        }
-        tmp_x = 2;
-        tmp_y += 6;
-    }
-    await_drawing();
-}
-
-void display_armor(unsigned char idx) {
-    if (idx < 3) {
-        tmp_x = idx*42;
-        tmp_y = 0;
-    } else {
-        tmp_x = (idx-3)*42;
-        tmp_y = 64;
-    }
-    
-    draw_sprite_now(85, 10, 42, 64, tmp_x, tmp_y, ARMORS_F_BANK);
-    await_drawing();
-
-    tilemap_ptr = armors_female_desc[idx];
-    tmp_x = 2;
-    tmp_y = 80;
-    tmp = tilemap_ptr[0];
-    while (tmp != '.') {
-        if (tmp == 0) {
-            tmp_x = -3;
-            tmp_y += 6;
-        } else if (tmp >= 'a' && tmp <= 'z') {
-            tmp2 = (tmp - 'a') << 2;
-            draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 61, FONTS_BANK);
-        } else if (tmp >= 'A' && tmp <= 'N') {
-            tmp2 = (tmp - 'A') * 9;
-            draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 22, FONTS_BANK);
-            tmp_x += 5;
-            tmp_y += 6;
-        } else if (tmp >= 'O' && tmp <= 'Z') {
-            tmp2 = (tmp - 'O') * 9;
-            draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 33, FONTS_BANK);
-            tmp_x += 5;
-            tmp_y += 6;
-        } else if (tmp >= '0' && tmp <= '9') {
-            tmp2 = (tmp - '0') << 2;
-            draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 67, FONTS_BANK);
-        }
-        
-        tmp_x += 5;
-        //tmp_y += 6;
-
-        tilemap_ptr++;
-        tmp = tilemap_ptr[0];
-    }
-    await_drawing();
-
-}
-
-void shop_armors() {
-    tile_val = 0;
-
-    while (1) {
-        clear_screen(0);
-        clear_border(0);
-        await_draw_queue();
-
-        draw_box_now(1, 12*tile_val+5, 1, 12, 30);
-        await_drawing();
-
-        display_armor_names();
-        display_armor(tile_val);
-        sleep(1);
-        flip_pages();
-
-        update_inputs();
-        if (player1_buttons & ~player1_old_buttons& INPUT_MASK_UP) {
-            if (tile_val != 0) {
-                tile_val--;
-            }
-        } else if (player1_buttons & ~player1_old_buttons & INPUT_MASK_DOWN) {
-            if (tile_val != 4) {
-                tile_val++;
-            }
-        }
-    }
-}
-
-#pragma code-name (pop)
-*/
-
-void interact() {
-    change_rom_bank(0xF9);
-    shop_armors();
-    change_rom_bank(0xFB);
-}
-
-int main () {
+void init_game() {
     seed = 42;
     player_x = -8;
     player_y = 0;
     player_dir = 0;
     player_step = 0;
-    tile_bank = WORLD_TILESET_BANK;
+    tile_bank = VRAM_WORLD_TILESET_BANK;
+    map = 0;
     for (tmp=0; tmp<63; tmp++) {
         visible[tmp] = 0;
     }
+}
 
+int main () {
     init_graphics();
     init_dynawave();
     init_music();
 
-    load_spritesheet((char*)&ASSET__auxilia__tileset_bmp, WORLD_TILESET_BANK);
-    load_spritesheet((char*)&ASSET__auxilia__sprites_bmp, SPRITES_BANK);
-    load_spritesheet((char*)&ASSET__auxilia0__splash_bmp, SPLASH_BANK);
-    load_spritesheet((char*)&ASSET__auxilia__tileset_city_bmp, CITY_TILESET_BANK);
-    load_spritesheet((char*)&ASSET__auxilia__font_bmp, FONTS_BANK);
-    load_spritesheet((char*)&ASSET__auxilia__armorsf_bmp, ARMORS_F_BANK);
+    load_spritesheet((char*)&ASSET__auxilia__tileset_bmp, VRAM_WORLD_TILESET_BANK);
+    load_spritesheet((char*)&ASSET__auxilia__sprites_bmp, VRAM_SPRITES_BANK);
+    load_spritesheet((char*)&ASSET__auxilia0__splash_bmp, VRAM_SPLASH_BANK);
+    load_spritesheet((char*)&ASSET__auxilia__tileset_city_bmp, VRAM_CITY_TILESET_BANK);
+    load_spritesheet((char*)&ASSET__auxilia__font_bmp, VRAM_FONTS_BANK);
+    load_spritesheet((char*)&ASSET__auxilia__armorsf_bmp, VRAM_ARMORS_F_BANK);
 
     clear_border(0);
     await_draw_queue();
@@ -579,15 +336,13 @@ int main () {
     clear_border(0);
     await_draw_queue();
 
-    flagsMirror = DMA_NMI | DMA_ENABLE | DMA_IRQ | DMA_OPAQUE | DMA_GCARRY;
-    *dma_flags = flagsMirror;
-
-    change_rom_bank(0xF9);
+//    change_rom_bank(MISC_CODE_BANK);
 //    shop_armors();
-    splash();
-    preamble();
+//    splash();
+//    preamble();
 
-    change_rom_bank(0xFB);
+    change_rom_bank(WORLD_TILEMAP_BANK);
+    init_game();
     set_map(0);
 
     while (1) {                                     //  Run forever
@@ -596,9 +351,9 @@ int main () {
         await_draw_queue();
 
         // Draw the playfield
-        rect.x=-8;rect.y=player_y;
-        rect.w=16;rect.h=16;
-        rect.b=tile_bank | BANK_CLIP_X;
+//        rect.x=-8;rect.y=player_y;
+//        rect.w=16;rect.h=16;
+//        rect.b=tile_bank | BANK_CLIP_X;
 
         tilemap_ptr2 = visible;
 
@@ -674,8 +429,8 @@ int main () {
         draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1);
         await_drawing();
 
-        draw_sprite(56, 48, 16, 16, 0, 0, SPRITES_BANK);
-        draw_sprite(0, 112, 96, 16, 0, 112, SPRITES_BANK);
+        draw_sprite(56, 48, 16, 16, 0, 0, VRAM_SPRITES_BANK);
+        draw_sprite(0, 112, 96, 16, 0, 112, VRAM_SPRITES_BANK);
         await_draw_queue();
 
         PROFILER_END(0);
@@ -687,9 +442,7 @@ int main () {
             player_step--;
         } else {
             update_inputs();
-            if ((player1_buttons & ~player1_old_buttons & INPUT_MASK_A)) {
-                interact();
-            } else {
+            tmp2 = 0;
             if((player1_buttons & INPUT_MASK_LEFT)) {
                 tilemap_ptr2 = player_ptr-1;
                 tmp = *tilemap_ptr2;
@@ -714,9 +467,6 @@ int main () {
                     player_step = 4;
                     tilemap_ptr -= 128;
                     player_ptr -= 128;
-                } else if (tmp2 & 0x4) {
-                    change_rom_bank(0xFA);
-                    set_map(1);
                 }
             } else if (player1_buttons & INPUT_MASK_DOWN) {
                 tmp = player_ptr[128];
@@ -728,6 +478,12 @@ int main () {
                     player_ptr += 128;
                 }
             }
+            // If we take action against an actionable tile
+            if ((player1_buttons & INPUT_MASK_A) && (tmp2 & 0x4)) {
+                interact(tmp);
+            // If we're about to step an an automatic actionable tile
+            } else if (tmp2 & 0x8) {
+                interact(tmp);
             }
         }
         set_visible_tiles();

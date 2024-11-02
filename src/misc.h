@@ -1,11 +1,11 @@
 #pragma code-name(push, "PROG4")
 void splash() {
-    draw_sprite(0, 0, 127, 127, 0, 0, SPLASH_BANK);
+    draw_sprite(0, 0, 127, 127, 0, 0, VRAM_SPLASH_BANK);
     while (1) {
         clear_screen(0);
         clear_border(0);
         rand();
-        draw_sprite(0, 0, 127, 127, 0, 0, SPLASH_BANK);
+        draw_sprite(0, 0, 127, 127, 0, 0, VRAM_SPLASH_BANK);
         await_draw_queue();
         sleep(1);
         flip_pages();
@@ -80,31 +80,31 @@ void preamble() {
             while (tmp) {
                 if (tmp >= 'a' && tmp <= 'z') {
                     tmp2 = (tmp - 'a') << 2;
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 61, FONTS_BANK);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 61, VRAM_FONTS_BANK);
                 } else if (tmp >= 'A' && tmp <= 'N') {
                     tmp2 = (tmp - 'A') * 9;
-                    draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 22, FONTS_BANK);
+                    draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 22, VRAM_FONTS_BANK);
                     tmp_x += 5;
                     tmp_y += 6;
                 } else if (tmp >= 'O' && tmp <= 'Z') {
                     tmp2 = (tmp - 'O') * 9;
-                    draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 33, FONTS_BANK);
+                    draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 33, VRAM_FONTS_BANK);
                     tmp_x += 5;
                     tmp_y += 6;
                 } else if (tmp == ',') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 108, 61, FONTS_BANK);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 108, 61, VRAM_FONTS_BANK);
                 } else if (tmp == '.') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 104, 61, FONTS_BANK);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 104, 61, VRAM_FONTS_BANK);
                 } else if (tmp == '\'') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 116, 61, FONTS_BANK);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 116, 61, VRAM_FONTS_BANK);
                 } else if (tmp == '"') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 112, 61, FONTS_BANK);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 112, 61, VRAM_FONTS_BANK);
                 } else if (tmp == '-') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 120, 61, FONTS_BANK);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 120, 61, VRAM_FONTS_BANK);
                 } else if (tmp == '!') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 124, 61, FONTS_BANK);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 124, 61, VRAM_FONTS_BANK);
                 } else if (tmp == '_') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 0, 66, FONTS_BANK);
+                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 0, 66, VRAM_FONTS_BANK);
                 }
                 tmp_x += 5;
                 tilemap_ptr++;
@@ -159,15 +159,15 @@ void display_armor_names() {
         while (tmp != 0) {
             if (tmp >= 'a' && tmp <= 'z') {
                 tmp2 = (tmp - 'a') << 2;
-                draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 61, FONTS_BANK);
+                draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 61, VRAM_FONTS_BANK);
             } else if (tmp >= 'A' && tmp <= 'N') {
                 tmp2 = (tmp - 'A') * 9;
-                draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 22, FONTS_BANK);
+                draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 22, VRAM_FONTS_BANK);
                 tmp_x += 5;
                 tmp_y += 6;
             } else if (tmp >= 'O' && tmp <= 'Z') {
                 tmp2 = (tmp - 'O') * 9;
-                draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 33, FONTS_BANK);
+                draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 33, VRAM_FONTS_BANK);
                 tmp_x += 5;
                 tmp_y += 6;
             }
@@ -190,7 +190,7 @@ void display_armor(unsigned char idx) {
         tmp_y = 64;
     }
     
-    draw_sprite_now(85, 10, 42, 64, tmp_x, tmp_y, ARMORS_F_BANK);
+    draw_sprite_now(85, 10, 42, 64, tmp_x, tmp_y, VRAM_ARMORS_F_BANK);
     await_drawing();
 
     tilemap_ptr = (unsigned char *)armors_female_desc[idx];
@@ -203,20 +203,20 @@ void display_armor(unsigned char idx) {
             tmp_y += 6;
         } else if (tmp >= 'a' && tmp <= 'z') {
             tmp2 = (tmp - 'a') << 2;
-            draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 61, FONTS_BANK);
+            draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 61, VRAM_FONTS_BANK);
         } else if (tmp >= 'A' && tmp <= 'N') {
             tmp2 = (tmp - 'A') * 9;
-            draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 22, FONTS_BANK);
+            draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 22, VRAM_FONTS_BANK);
             tmp_x += 5;
             tmp_y += 6;
         } else if (tmp >= 'O' && tmp <= 'Z') {
             tmp2 = (tmp - 'O') * 9;
-            draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 33, FONTS_BANK);
+            draw_sprite_now(tmp_x, tmp_y, 9, 11, tmp2, 33, VRAM_FONTS_BANK);
             tmp_x += 5;
             tmp_y += 6;
         } else if (tmp >= '0' && tmp <= '9') {
             tmp2 = (tmp - '0') << 2;
-            draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 67, FONTS_BANK);
+            draw_sprite_now(tmp_x, tmp_y, 4, 5, tmp2, 67, VRAM_FONTS_BANK);
         }
         
         tmp_x += 5;
