@@ -3,6 +3,8 @@
 void interact_castle();
 void init_game();
 void recompute_dashboard();
+void monster_action();
+void attack_monster();
 
 #pragma data-name (push, "SAVE")
 #pragma data-name (pop)
@@ -62,14 +64,14 @@ const unsigned char world_tileset_property[64] = {
   2,  3,  3,  3,  6,  6,  6,  6,
   2,  2,  3,  3,  3,  3,  3,  3,
   2,  2,  3,  3,  0,  3,  2,  3,
-  2,  2,  3,  3,  3,  3,  3,  3
+  2,  6,  3,  3,  3,  3,  3,  3
 };
 
 const unsigned char city_tileset_property[64] = {
   6,  6,  6,  6,  6,  6,  6,  6,
   6,  6,  6,  6,  6,  6,  6,  6,
   6,  6,  6,  6,  6,  3,  3,  3,
-  3,  3,  3,  3,  0,  3,  3,  3,
+  3,  3,  3,  3,  0,  3,  6,  6,
   3,  3,  3,  3,  0,  2,  2,  2,
   2,  2,  3,  3,  3,  2,  2,  2,
   2,  2,  3,  3,  0,  2,  3,  3,
@@ -115,10 +117,13 @@ struct Map {
 };
 
 struct Monster monsters[NB_MONSTERS];
+struct Monster monsters_world[NB_MONSTERS];
+struct Monster monsters_dungeon[NB_MONSTERS];
 
-const struct Map maps[2] = {
+const struct Map maps[3] = {
     {0x1BB8, 0x38, 0x37, VRAM_WORLD_TILESET_BANK, world_tileset_property},
-    {0x1B9B, 0x1B, 0x37, VRAM_CITY_TILESET_BANK, city_tileset_property}
+    {0x1B9B, 0x1B, 0x37, VRAM_CITY_TILESET_BANK, city_tileset_property},
+    {0xB9C, 28, 23, VRAM_CITY_TILESET_BANK, city_tileset_property}
 };
 
 struct TileVisibility {
@@ -176,7 +181,21 @@ void breakpoint() {}
 
 void set_map(unsigned char map_idx) {
     struct Map *map = (struct Map *)&maps[map_idx];
+
+    // If we're leaving the world map, save the monsters
+    if (map_idx == 0) {
+        for (tmp=0; tmp<NB_MONSTERS; tmp++) {
+            monsters_world[tmp] = monsters[tmp];
+            monsters[tmp].tile_idx = 0;
+        }
+    }
     map_id = map_idx;
+    // If we're back to the world map, restore the monsters
+    if (map_id == 0) {
+        for (tmp=0; tmp<NB_MONSTERS; tmp++) {
+            monsters[tmp] = monsters_world[tmp];
+        }
+    }    
     tilemap_ptr = (unsigned char *)&tilemap0[map->entry_offset];
     tilemap_x = map->entry_x;
     tilemap_y = map->entry_y;
@@ -226,9 +245,7 @@ void set_visible_tiles() {
         if (!monsters[tmp].tile_idx) continue;
         tmp_x = (char)(monsters[tmp].x) - (char)tilemap_x;
         tmp_y = (char)(monsters[tmp].y) - (char)tilemap_y;
-        if (//diff_x < 128 &&
-            tmp_x < 9 &&
-//            diff_y < 128 &&
+        if (tmp_x < 9 &&
             tmp_y < 7) {
             tmp2 = tmp_y*9 + tmp_x;
             visible[tmp2] |= 0x80;
@@ -241,24 +258,33 @@ void set_visible_tiles() {
     }
 }
 
-//#include "misc.h"
-
 void interact(unsigned char tile) {
     if (map_id == 0) {
-        change_rom_bank(CITY_TILEMAP_BANK);
-        set_map(1);
+        if (player_ptr == 0xa6cb) {
+            change_rom_bank(DUNGEON_TILEMAP_BANK);
+            set_map(2);
+        } else {
+            change_rom_bank(CITY_TILEMAP_BANK);
+            set_map(1);
+        }
         return;
-    }
-    // We leave the city
-    if (tile == 63) {
+    } else if (map_id == 1) {
+        // We leave the city
+        if (tile == 63) {
+            change_rom_bank(WORLD_TILEMAP_BANK);
+            set_map(0);
+            return;
+        }
+
+        change_rom_bank(MISC_CODE_BANK);
+        interact_castle(tile);
+        change_rom_bank(CITY_TILEMAP_BANK);
+    } else if (map_id == 2) {
+        // We leave the dungeon
         change_rom_bank(WORLD_TILEMAP_BANK);
         set_map(0);
         return;
     }
-
-    change_rom_bank(MISC_CODE_BANK);
-    interact_castle(tile);
-    change_rom_bank(CITY_TILEMAP_BANK);
 }
 
 int main () {
@@ -392,8 +418,8 @@ int main () {
         } else {
             update_inputs();
             tmp2 = 0;
+            tmp = 0;
             if((player1_buttons & INPUT_MASK_LEFT)) {
-//                tmp_tilemap_ptr = player_ptr-1;
                 tmp_tilemap_ptr = player_ptr-1;
                 tmp = visible[30];
                 tmp2 = tileset_property[tmp];
@@ -414,6 +440,7 @@ int main () {
                     player_ptr++;
                 }
             } else if (player1_buttons & INPUT_MASK_UP) {
+                tmp_tilemap_ptr = player_ptr-128;
                 tmp = visible[22];
                 tmp2 = tileset_property[tmp];
                 if (tmp2 & 0x1 && !(tmp & 0x80)) {
@@ -423,6 +450,7 @@ int main () {
                     player_ptr -= 128;
                 }
             } else if (player1_buttons & INPUT_MASK_DOWN) {
+                tmp_tilemap_ptr = player_ptr+128;
                 tmp = visible[40];
                 tmp2 = tileset_property[tmp];
                 if (tmp2 & 0x1 && !(tmp & 0x80)) {
@@ -436,29 +464,22 @@ int main () {
             if (player1_buttons & ~player1_old_buttons & INPUT_MASK_A) {
                 if (tmp2 & 0x4) {
                     interact(tmp);
+                // There is a monster => we're attacking!
                 } else if (tmp & 0x80) {
-                    for (tmp=0; tmp<NB_MONSTERS; tmp++) {
-                        breakpoint();
-                        if (!monsters[tmp].tile_idx) continue;
-                        if (monsters[tmp].tilemap_ptr == tmp_tilemap_ptr) {
-                            monsters[tmp].hp--;
-                            if (monsters[tmp].hp == 0) {
-                                play_sound_effect((char*)&ASSET__sfx__hit_bin, 2);
-                                monsters[tmp].tile_idx = 0;
-                                attr_gp += monsters[tmp].gp;
-                                attr_xp += monsters[tmp].xp;
-                                change_rom_bank(MISC_CODE_BANK);
-                                recompute_dashboard();
-                                change_rom_bank(WORLD_TILEMAP_BANK);
-                            } else {
-                                play_sound_effect((char*)&ASSET__sfx__gunshot_bin, 1);
-                            }
-                        }
-                    }
+                    change_rom_bank(MISC_CODE_BANK);
+                    attack_monster();
+                    change_rom_bank(WORLD_TILEMAP_BANK);
                 }
             // If we're about to step an an automatic actionable tile
             } else if (tmp2 & 0x8) {
                 interact(tmp);
+            }
+
+            // Monster movement (world only)
+            if (map_id == 0 && (player1_buttons & ~player1_old_buttons)) {
+                change_rom_bank(MISC_CODE_BANK);
+                monster_action();
+                change_rom_bank(WORLD_TILEMAP_BANK);
             }
         }
         set_visible_tiles();

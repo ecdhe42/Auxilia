@@ -15,9 +15,10 @@
 #define VRAM_FONTS_BANK          4
 #define VRAM_ARMORS_F_BANK       5
 
-#define WORLD_TILEMAP_BANK  0xFB
-#define CITY_TILEMAP_BANK   0xFA
-#define MISC_CODE_BANK      0xF9
+#define WORLD_TILEMAP_BANK      0xFB
+#define CITY_TILEMAP_BANK       0xFA
+#define DUNGEON_TILEMAP_BANK    0xF9
+#define MISC_CODE_BANK          0xFD
 
 #define NB_MONSTERS         10
 
@@ -36,6 +37,7 @@ struct Monster {
     unsigned char hp;
     unsigned char gp;
     unsigned char xp;
+    unsigned char strength;
 };
 
 #define draw_tile_init(w, h, ramBank) \

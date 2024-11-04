@@ -28,7 +28,7 @@ extern struct Monster monsters[NB_MONSTERS];
 //extern const struct Monster available_monsters[1];
 
 const struct Monster available_monsters[1] = {
-    { 24, 0, 0, 0, 0, 0, 10, 10, 10 }
+    { 24, 0, 0, 0, 0, 0, 10, 10, 10, 2 }
 };
 
 #pragma zpsym ("tmp");
@@ -60,7 +60,7 @@ const struct Monster available_monsters[1] = {
 #pragma zpsym ("attr_level_digits");
 #pragma zpsym ("tile_bank");
 
-#pragma code-name(push, "PROG4")
+#pragma code-name(push, "PROG0")
 void init_game() {
     player_step = 0;
     tile_bank = VRAM_WORLD_TILESET_BANK;
@@ -385,6 +385,18 @@ void interact_castle(unsigned char tile) {
 }
 
 void recompute_dashboard() {
+    long_val1 = attr_hp;
+    attr_hp_digits[3] = long_val1 / 1000;
+    long_val1 -= 1000*attr_hp_digits[3];
+    attr_hp_digits[2] = long_val1 / 100;
+    long_val1 -= 100*attr_hp_digits[2];
+    attr_hp_digits[1] = long_val1 / 10;
+    long_val1 -= 10*attr_hp_digits[1];
+    attr_hp_digits[3] = attr_hp_digits[3] << 2;
+    attr_hp_digits[2] = attr_hp_digits[2] << 2;
+    attr_hp_digits[1] = attr_hp_digits[1] << 2;
+    attr_hp_digits[0] = long_val1 << 2;
+
     long_val1 = attr_gp;
     attr_gp_digits[3] = long_val1 / 1000;
     long_val1 -= 1000*attr_gp_digits[3];
@@ -438,6 +450,35 @@ void draw_dashboard() {
         draw_left_tile(118, 113, attr_level_digits[0], 67);
         await_drawing();
         draw_sprite(0, 112, 112, 16, 0, 112, VRAM_SPRITES_BANK);
+}
+
+void attack_monster() {
+    for (tmp=0; tmp<NB_MONSTERS; tmp++) {
+        if (!monsters[tmp].tile_idx) continue;
+        if (monsters[tmp].tilemap_ptr == tmp_tilemap_ptr) {
+            monsters[tmp].hp-=2;
+            if (monsters[tmp].hp == 0) {
+                play_sound_effect((char*)&ASSET__sfx__hit_bin, 2);
+                monsters[tmp].tile_idx = 0;
+                attr_gp += monsters[tmp].gp;
+                attr_xp += monsters[tmp].xp;
+                recompute_dashboard();
+            } else {
+                play_sound_effect((char*)&ASSET__sfx__gunshot_bin, 1);
+            }
+        }
+    }
+}
+
+void monster_action() {
+    for (tmp=0; tmp<NB_MONSTERS; tmp++) {
+    if (!monsters[tmp].tile_idx) continue;
+    if ((monsters[tmp].visible_x == 3 || monsters[tmp].visible_x == 5) && monsters[tmp].visible_y == 3) {
+        play_sound_effect((char*)&ASSET__sfx__hit_bin, 2);
+        attr_hp -= monsters[tmp].strength;
+        recompute_dashboard();
+    }
+}
 }
 
 #pragma code-name (pop)
