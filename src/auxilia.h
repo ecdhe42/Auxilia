@@ -40,6 +40,15 @@ struct Monster {
     unsigned char strength;
 };
 
+struct Map {
+    int entry_offset;
+    unsigned char entry_x;
+    unsigned char entry_y;
+    unsigned char tileset_bank;
+    unsigned char tilemap_bank;
+    const unsigned char *tileset_property;
+};
+
 #define draw_tile_init(w, h, ramBank) \
     flagsMirror |= DMA_ENABLE | DMA_OPAQUE | DMA_IRQ | DMA_GCARRY; \
     flagsMirror &= ~(DMA_COLORFILL_ENABLE | DMA_OPAQUE); \

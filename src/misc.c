@@ -1,5 +1,8 @@
 #include "auxilia.h"
 
+void interact(unsigned char tile);
+void set_visible_tiles();
+
 extern unsigned char tmp, tmp2, tmp3, tmp_x, tmp_y, tile_val;
 extern unsigned char *tilemap_ptr;
 extern unsigned char *tmp_tilemap_ptr;
@@ -22,9 +25,27 @@ extern unsigned char attr_mana_digits[4];
 extern unsigned char attr_level_digits[2];
 extern unsigned char visible[63];
 extern unsigned char player_step;
-extern unsigned char tile_bank;
+extern unsigned char tileset_bank;
+extern unsigned char tilemap_bank;
+extern unsigned char map_id;
+extern unsigned char tilemap_x;
+extern unsigned char tilemap_y;
 
-extern struct Monster monsters[NB_MONSTERS];
+extern unsigned char monster_tile_idx[NB_MONSTERS];
+extern unsigned char *monster_tilemap_ptr[NB_MONSTERS];
+extern unsigned char monster_x[NB_MONSTERS];
+extern unsigned char monster_y[NB_MONSTERS];
+extern unsigned char monster_visible_x[NB_MONSTERS];
+extern unsigned char monster_visible_y[NB_MONSTERS];
+extern unsigned char monster_hp[NB_MONSTERS];
+extern unsigned char monster_gp[NB_MONSTERS];
+extern unsigned char monster_xp[NB_MONSTERS];
+extern unsigned char monster_strength[NB_MONSTERS];
+extern unsigned char *world_tilemap_ptr;
+extern unsigned char world_tilemap_x;
+extern unsigned char world_tilemap_y;
+extern const struct Map maps[3];
+extern unsigned char tileset_property[64];
 //extern const struct Monster available_monsters[1];
 
 const struct Monster available_monsters[1] = {
@@ -58,22 +79,42 @@ const struct Monster available_monsters[1] = {
 #pragma zpsym ("attr_gp_digits");
 #pragma zpsym ("attr_mana_digits");
 #pragma zpsym ("attr_level_digits");
-#pragma zpsym ("tile_bank");
+#pragma zpsym ("tileset_bank");
+#pragma zpsym ("tilemap_bank");
+#pragma zpsym ("map_id");
+#pragma zpsym ("tilemap_x");
+#pragma zpsym ("tilemap_y");
 
 #pragma code-name(push, "PROG0")
 void init_game() {
     player_step = 0;
-    tile_bank = VRAM_WORLD_TILESET_BANK;
+    tileset_bank = VRAM_WORLD_TILESET_BANK;
+    tilemap_bank = WORLD_TILEMAP_BANK;
     for (tmp=0; tmp<63; tmp++) {
         visible[tmp] = 0;
     }
     for (tmp=0; tmp<NB_MONSTERS; tmp++) {
-        monsters->tile_idx = 0;
+        monster_tile_idx[tmp] = 0;
     }
-    monsters[0] = available_monsters[0];
-    monsters[0].x = 57;
-    monsters[0].y = 57;
-    monsters[0].tilemap_ptr = 0x8000 + 57*128+57;
+
+    // Temp: setup one monster near the castle
+    monster_tile_idx[0] = available_monsters[0].tile_idx;
+    monster_visible_x[0] = available_monsters[0].visible_x;
+    monster_visible_y[0] = available_monsters[0].visible_y;
+    monster_hp[0] = available_monsters[0].hp;
+    monster_gp[0] = available_monsters[0].gp;
+    monster_xp[0] = available_monsters[0].xp;
+    monster_strength[0] = available_monsters[0].strength;
+    monster_x[0]= 57;
+    monster_y[0] = 57;
+    monster_tilemap_ptr[0] = (unsigned char *)(0x8000 + 57*128+57);
+
+    world_tilemap_ptr = (unsigned char *)(maps[0].entry_offset + 0x8000);
+    world_tilemap_x = maps[0].entry_x;
+    world_tilemap_y = maps[0].entry_y;
+    tilemap_ptr = world_tilemap_ptr;
+    tilemap_x = world_tilemap_x;
+    tilemap_y = world_tilemap_y;
 
     attr_hp = 100;
     attr_gp = 0;
@@ -454,14 +495,14 @@ void draw_dashboard() {
 
 void attack_monster() {
     for (tmp=0; tmp<NB_MONSTERS; tmp++) {
-        if (!monsters[tmp].tile_idx) continue;
-        if (monsters[tmp].tilemap_ptr == tmp_tilemap_ptr) {
-            monsters[tmp].hp-=2;
-            if (monsters[tmp].hp == 0) {
+        if (!monster_tile_idx[tmp]) continue;
+        if (monster_tilemap_ptr[tmp] == tmp_tilemap_ptr) {
+            monster_hp[tmp]-=2;
+            if (monster_hp[tmp] == 0) {
                 play_sound_effect((char*)&ASSET__sfx__hit_bin, 2);
-                monsters[tmp].tile_idx = 0;
-                attr_gp += monsters[tmp].gp;
-                attr_xp += monsters[tmp].xp;
+                monster_tile_idx[tmp] = 0;
+                attr_gp += monster_gp[tmp];
+                attr_xp += monster_xp[tmp];
                 recompute_dashboard();
             } else {
                 play_sound_effect((char*)&ASSET__sfx__gunshot_bin, 1);
@@ -472,13 +513,181 @@ void attack_monster() {
 
 void monster_action() {
     for (tmp=0; tmp<NB_MONSTERS; tmp++) {
-    if (!monsters[tmp].tile_idx) continue;
-    if ((monsters[tmp].visible_x == 3 || monsters[tmp].visible_x == 5) && monsters[tmp].visible_y == 3) {
+    if (!monster_tile_idx[tmp]) continue;
+    if ((monster_visible_x[tmp] == 3 || monster_visible_x[tmp] == 5) && monster_visible_y[tmp] == 3) {
         play_sound_effect((char*)&ASSET__sfx__hit_bin, 2);
-        attr_hp -= monsters[tmp].strength;
+        attr_hp -= monster_strength[tmp];
         recompute_dashboard();
     }
 }
+}
+
+void main_loop() {
+//        while (1) {                                     //  Run forever
+//        clear_screen(0);
+//        clear_border(0);
+        await_draw_queue();
+
+        // Draw the playfield
+//        rect.x=-8;rect.y=player_y;
+//        rect.w=16;rect.h=16;
+//        rect.b=tile_bank | BANK_CLIP_X;
+
+        tmp_tilemap_ptr = visible;
+
+        tmp = *tmp_tilemap_ptr;
+        tmp_x = -8;
+        tmp_y = 0;
+
+        //*bank_reg = BANK_CLIP_X | BANK_CLIP_Y;
+        draw_tile_init(16, 16, tileset_bank | BANK_CLIP_X);
+
+        draw_left_tile(-8, 0, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr ++; tmp = *tmp_tilemap_ptr;
+        draw_left_tile(-8, 16, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr ++; tmp = *tmp_tilemap_ptr;
+        draw_left_tile(-8, 32, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr ++; tmp = *tmp_tilemap_ptr;
+        draw_left_tile(-8, 48, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr ++; tmp = *tmp_tilemap_ptr;
+        draw_left_tile(-8, 64, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr ++; tmp = *tmp_tilemap_ptr;
+        draw_left_tile(-8, 80, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr ++; tmp = *tmp_tilemap_ptr;
+        draw_left_tile(-8, 96, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(8, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(24, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(40, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(56, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(72, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(88, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(104, (tmp & 0x7) << 4, (tmp & 0xF8) << 1); tmp_tilemap_ptr++; tmp = *tmp_tilemap_ptr;
+        draw_next_tile(120, (tmp & 0x7) << 4, (tmp & 0xF8) << 1);
+
+        await_drawing();
+
+        draw_sprite(56, 48, 16, 16, 0, 0, VRAM_SPRITES_BANK);
+        for (tmp=0; tmp<NB_MONSTERS; tmp++) {
+            tile_val = monster_tile_idx[tmp];
+            if (tile_val & 0x80) {
+                draw_sprite(monster_visible_x[tmp]*16-8, monster_visible_y[tmp]*16, 16, 16, (tile_val & 0x7) << 3, (tile_val & 0x78) << 1, VRAM_SPRITES_BANK | BANK_CLIP_X);
+            }
+        }
+        await_draw_queue();
+
+        PROFILER_END(0);
+        sleep(1);
+        flip_pages();
+        PROFILER_START(0);
+
+        if (player_step) {
+            player_step--;
+        } else {
+            update_inputs();
+            tmp2 = 0;
+            tmp = 0;
+            if((player1_buttons & INPUT_MASK_LEFT)) {
+                tmp_tilemap_ptr = player_ptr-1;
+                tmp = visible[30];
+                tmp2 = tileset_property[tmp];
+                if (tmp2 & 0x1 && !(tmp & 0x80)) {
+                    player_step = 4;
+                    tilemap_ptr--;
+                    tilemap_x--;
+                    player_ptr--;
+                }
+            } else if ((player1_buttons & INPUT_MASK_RIGHT)) {
+                tmp_tilemap_ptr = player_ptr+1;
+                tmp = visible[32];
+                tmp2 = tileset_property[tmp];
+                if (tmp2 & 0x1 && !(tmp & 0x80)) {
+                    player_step = 4;
+                    tilemap_ptr++;
+                    tilemap_x++;
+                    player_ptr++;
+                }
+            } else if (player1_buttons & INPUT_MASK_UP) {
+                tmp_tilemap_ptr = player_ptr-128;
+                tmp = visible[22];
+                tmp2 = tileset_property[tmp];
+                if (tmp2 & 0x1 && !(tmp & 0x80)) {
+                    player_step = 4;
+                    tilemap_ptr -= 128;
+                    tilemap_y--;
+                    player_ptr -= 128;
+                }
+            } else if (player1_buttons & INPUT_MASK_DOWN) {
+                tmp_tilemap_ptr = player_ptr+128;
+                tmp = visible[40];
+                tmp2 = tileset_property[tmp];
+                if (tmp2 & 0x1 && !(tmp & 0x80)) {
+                    player_step = 4;
+                    tilemap_ptr += 128;
+                    tilemap_y++;
+                    player_ptr += 128;
+                }
+            }
+            // If we take action against an actionable tile
+            if (player1_buttons & ~player1_old_buttons & INPUT_MASK_A) {
+                if (tmp2 & 0x4) {
+                    interact(tmp);
+                // There is a monster => we're attacking!
+                } else if (tmp & 0x80) {
+                    attack_monster();
+                }
+            // If we're about to step an an automatic actionable tile
+            } else if (tmp2 & 0x8) {
+                interact(tmp);
+            }
+
+            // Monster movement (world only)
+            if (map_id == 0 && (player1_buttons & ~player1_old_buttons)) {
+                monster_action();
+            }
+        }
+
 }
 
 #pragma code-name (pop)
