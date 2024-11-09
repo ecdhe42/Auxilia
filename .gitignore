@@ -5,3 +5,4 @@ build
 *.jpeg
 src/gen/*
 src/gen/assets/*
+bin

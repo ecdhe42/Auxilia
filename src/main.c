@@ -1,6 +1,9 @@
 #include "auxilia.h"
 
-void interact_castle();
+void splash();
+void preamble();
+void interact_castle(unsigned char tile);
+void interact_sunglow(unsigned char tile);
 void init_game();
 void recompute_dashboard();
 void monster_action();
@@ -72,11 +75,11 @@ const unsigned char world_tileset_property[64] = {
 const unsigned char city_tileset_property[64] = {
   6,  6,  6,  6,  6,  6,  6,  6,
   6,  6,  6,  6,  6,  6,  6,  6,
-  6,  6,  6,  6,  6,  3,  3,  3,
+  6,  6,  6,  6,  6,  3,  3,  1,
   3,  3,  3,  3,  0,  3,  6,  6,
-  3,  3,  3,  3,  0,  2,  2,  2,
-  2,  2,  3,  3,  3,  2,  2,  2,
-  2,  2,  3,  3,  0,  2,  3,  3,
+  3,  3,  3,  3,  0,  6,  6,  6,
+  2,  2,  3,  2,  3,  2,  2,  2,
+  2,  2,  3,  3,  0,  2,  3,  6,
   2,  2,  3,  3,  3,  3,  3,  11
 };
 
@@ -127,6 +130,7 @@ unsigned char monster_hp[NB_MONSTERS];
 unsigned char monster_gp[NB_MONSTERS];
 unsigned char monster_xp[NB_MONSTERS];
 unsigned char monster_strength[NB_MONSTERS];
+unsigned char monster_hit[NB_MONSTERS];
 
 //struct Monster monsters[NB_MONSTERS];
 // We use these structures only when switching maps so the overhead
@@ -134,10 +138,11 @@ unsigned char monster_strength[NB_MONSTERS];
 struct Monster monsters_world[NB_MONSTERS];
 struct Monster monsters_dungeon[NB_MONSTERS];
 
-const struct Map maps[3] = {
-    {0x1BB8, 0x38, 0x37, VRAM_WORLD_TILESET_BANK, WORLD_TILEMAP_BANK, world_tileset_property},
-    {0x1B9B, 0x1B, 0x37, VRAM_CITY_TILESET_BANK, CITY_TILEMAP_BANK, city_tileset_property},
-    {0xB9C, 28, 23, VRAM_CITY_TILESET_BANK, DUNGEON_TILEMAP_BANK, city_tileset_property}
+const struct Map maps[4] = {
+    {0x1BB8, 0x38, 0x37, VRAM_WORLD_TILESET_BANK, WORLD_TILEMAP_BANK, world_tileset_property},  // World
+    {0x1B9B, 0x1B, 0x37, VRAM_CITY_TILESET_BANK, CITY_TILEMAP_BANK, city_tileset_property},     // Castle
+    {0xD42, 66, 26, VRAM_CITY_TILESET_BANK, CITY_TILEMAP_BANK, city_tileset_property},          // Sunglow
+    {0xB9C, 28, 23, VRAM_CITY_TILESET_BANK, DUNGEON_TILEMAP_BANK, city_tileset_property}        // Dungeon
 };
 
 struct TileVisibility {
@@ -195,7 +200,7 @@ void breakpoint() {}
 
 void set_map(unsigned char map_idx) {
     struct Map *map = (struct Map *)&maps[map_idx];
-
+    breakpoint();
     // If we're leaving the world map, save the state (player position, monsters)
     if (map_id == 0) {
         for (tmp=0; tmp<NB_MONSTERS; tmp++) {
@@ -229,6 +234,7 @@ void set_map(unsigned char map_idx) {
             monster_gp[tmp] = monsters_world[tmp].gp;
             monster_xp[tmp] = monsters_world[tmp].xp;
             monster_strength[tmp] = monsters_world[tmp].strength;
+            monster_hit[tmp] = 0;
         }
         tilemap_ptr = world_tilemap_ptr;
         tilemap_x = world_tilemap_x;
@@ -239,8 +245,7 @@ void set_map(unsigned char map_idx) {
         tilemap_y = map->entry_y;
     }
 
-    tmp_tilemap_ptr = tilemap_ptr;
-    player_ptr = (unsigned char *)&tilemap0[map->entry_offset+128*3+4];
+    player_ptr = tilemap_ptr + 128*3+4;
     tileset_bank = map->tileset_bank;
     tilemap_bank = map->tilemap_bank;
     for (tmp=0; tmp<64; tmp++) {
@@ -300,9 +305,14 @@ void set_visible_tiles() {
 
 void interact(unsigned char tile) {
     if (map_id == 0) {
+        // Entering dungeon
         if (player_ptr == (unsigned char *)0xa6cb) {
+            set_map(3);
+        // Entering Sunglow
+        } else if (player_ptr == (unsigned char *)0x87d0) {
             set_map(2);
         } else {
+            // Entering the castle
             set_map(1);
         }
         return;
@@ -315,6 +325,13 @@ void interact(unsigned char tile) {
 
         interact_castle(tile);
     } else if (map_id == 2) {
+        // We leave the city
+        if (tile == 63) {
+            set_map(0);
+            return;
+        }
+        interact_sunglow(tile);
+    } else if (map_id == 3) {
         // We leave the dungeon
         set_map(0);
         return;
@@ -332,6 +349,10 @@ int main () {
     load_spritesheet((char*)&ASSET__auxilia__tileset_city_bmp, VRAM_CITY_TILESET_BANK);
     load_spritesheet((char*)&ASSET__auxilia__font_bmp, VRAM_FONTS_BANK);
     load_spritesheet((char*)&ASSET__auxilia__armorsf_bmp, VRAM_ARMORS_F_BANK);
+
+    change_rom_bank(INTRO_CODE_BANK);
+//    splash();
+//    preamble();
 
     change_rom_bank(MISC_CODE_BANK);
     init_game();

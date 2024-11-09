@@ -19,6 +19,7 @@
 #define CITY_TILEMAP_BANK       0xFA
 #define DUNGEON_TILEMAP_BANK    0xF9
 #define MISC_CODE_BANK          0xFD
+#define INTRO_CODE_BANK         0xFC
 
 #define NB_MONSTERS         10
 
