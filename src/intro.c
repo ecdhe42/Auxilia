@@ -38,14 +38,17 @@ void splash() {
     }
 }
 
-const char *preamble_text[40] = {
+const char *preamble_text[43] = {
     "_______________________",
-    "An evil wizard is",
-    "threatening the land of",
-    "continentalia, sending",
+    "The peaceful land of",
+    "continentalia is",
+    "threatened by a wizard",
+    "so evil and op that it's",
+    "weird nobody saw him",
+    "coming. he is sending",
     "hordes of monsters who",
     "will happily die for him,",
-    "even when sent on suicide",
+    "even when sent on stupid",
     "missions. the wizard is",
     "pure evil, so the only ",
     "course of action is the",
@@ -91,7 +94,7 @@ void preamble() {
 
         tmp_y = 0;
 
-        for (tmp3=0; tmp3<20; tmp3++) {
+        for (tmp3=0; tmp3<18; tmp3++) {
             tmp_x = 2;
             tmp_tilemap_ptr = (unsigned char*)preamble_text[tmp3+tile_val];
             tmp = tmp_tilemap_ptr[0];
@@ -110,9 +113,9 @@ void preamble() {
                     tmp_x += 5;
                     tmp_y += 6;
                 } else if (tmp == ',') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 108, 61, VRAM_FONTS_BANK);
+                    draw_sprite_now(tmp_x, tmp_y+1, 4, 5, 108, 61, VRAM_FONTS_BANK);
                 } else if (tmp == '.') {
-                    draw_sprite_now(tmp_x, tmp_y, 4, 5, 104, 61, VRAM_FONTS_BANK);
+                    draw_sprite_now(tmp_x, tmp_y, 2, 5, 107, 61, VRAM_FONTS_BANK);
                 } else if (tmp == '\'') {
                     draw_sprite_now(tmp_x, tmp_y, 4, 5, 116, 61, VRAM_FONTS_BANK);
                 } else if (tmp == '"') {
@@ -129,7 +132,7 @@ void preamble() {
                 tmp = tmp_tilemap_ptr[0];
             }
             tmp_tilemap_ptr++;
-            tmp_y += 6;
+            tmp_y += 7;
         }
 
         await_drawing();
@@ -142,7 +145,7 @@ void preamble() {
                 tile_val--;
             }
         } else if (player1_buttons & INPUT_MASK_DOWN) {
-            if (tile_val != 20) {
+            if (tile_val != 26) {
                 tile_val++;
             }
         }

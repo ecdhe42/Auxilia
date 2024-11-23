@@ -47,6 +47,8 @@ unsigned char attr_strength;
 unsigned char attr_dext;
 unsigned char attr_stamina;
 unsigned char attr_int;
+unsigned char attr_weapon;
+unsigned char attr_armor;
 unsigned char attr_hp_digits[4];
 unsigned char attr_xp_digits[4];
 unsigned char attr_gp_digits[4];
@@ -139,7 +141,7 @@ struct Monster monsters_world[NB_MONSTERS];
 struct Monster monsters_dungeon[NB_MONSTERS];
 
 const struct Map maps[4] = {
-    {0x1BB8, 0x38, 0x37, VRAM_WORLD_TILESET_BANK, WORLD_TILEMAP_BANK, world_tileset_property},  // World
+    {0x22A4, 0x24, 0x44, VRAM_WORLD_TILESET_BANK, WORLD_TILEMAP_BANK, world_tileset_property},  // World
     {0x1B9B, 0x1B, 0x37, VRAM_CITY_TILESET_BANK, CITY_TILEMAP_BANK, city_tileset_property},     // Castle
     {0xD42, 66, 26, VRAM_CITY_TILESET_BANK, CITY_TILEMAP_BANK, city_tileset_property},          // Sunglow
     {0xB9C, 28, 23, VRAM_CITY_TILESET_BANK, DUNGEON_TILEMAP_BANK, city_tileset_property}        // Dungeon
@@ -306,10 +308,13 @@ void set_visible_tiles() {
 void interact(unsigned char tile) {
     if (map_id == 0) {
         // Entering dungeon
-        if (player_ptr == (unsigned char *)0xa6cb) {
+        if (player_ptr == (unsigned char *)0xadd6) {
             set_map(3);
         // Entering Sunglow
-        } else if (player_ptr == (unsigned char *)0x87d0) {
+        } else if (player_ptr == (unsigned char *)0xbbc6 ||
+                   player_ptr == (unsigned char *)0xbc45 ||
+                   player_ptr == (unsigned char *)0xbcc6 ||
+                   player_ptr == (unsigned char *)0xbc47) {
             set_map(2);
         } else {
             // Entering the castle

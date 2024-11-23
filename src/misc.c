@@ -2,6 +2,7 @@
 
 void interact(unsigned char tile);
 void set_visible_tiles();
+void recompute_dashboard();
 
 extern unsigned char tmp, tmp2, tmp3, tmp_x, tmp_y, tile_val;
 extern unsigned char *tilemap_ptr;
@@ -12,6 +13,8 @@ extern int attr_hp;
 extern int attr_xp;
 extern int attr_gp;
 extern int attr_mana;
+extern unsigned char attr_weapon;
+extern unsigned char attr_armor;
 extern unsigned char attr_gender;
 extern unsigned char attr_level;
 extern unsigned char attr_strength;
@@ -30,6 +33,8 @@ extern unsigned char tilemap_bank;
 extern unsigned char map_id;
 extern unsigned char tilemap_x;
 extern unsigned char tilemap_y;
+
+unsigned char dialog_selection;
 
 extern unsigned char monster_tile_idx[NB_MONSTERS];
 extern unsigned char *monster_tilemap_ptr[NB_MONSTERS];
@@ -68,6 +73,8 @@ const struct Monster available_monsters[1] = {
 #pragma zpsym ("attr_xp");
 #pragma zpsym ("attr_gp");
 #pragma zpsym ("attr_mana");
+#pragma zpsym ("attr_weapon");
+#pragma zpsym ("attr_armor");
 #pragma zpsym ("attr_gender");
 #pragma zpsym ("attr_level");
 #pragma zpsym ("attr_strength");
@@ -86,6 +93,12 @@ const struct Monster available_monsters[1] = {
 #pragma zpsym ("tilemap_y");
 
 #pragma code-name(push, "PROG0")
+
+const char *buy_str = "Buy";
+const char *pass_str = "Pass";
+const char *yes_str = "Yes";
+const char *no_str = "No";
+
 void init_game() {
     player_step = 0;
     map_id = 0;
@@ -122,6 +135,8 @@ void init_game() {
     attr_xp = 0;
     attr_mana = 10;
     attr_level = 1;
+    attr_armor = 0;
+    attr_weapon = 0;
     attr_hp_digits[0] = 0;
     attr_hp_digits[1] = 0;
     attr_hp_digits[2] = 4;
@@ -180,7 +195,7 @@ void print_line() {
         } else if (tmp == ',') {
             draw_sprite_now(tmp_x, tmp_y, 4, 5, 108, 61, VRAM_FONTS_BANK);
         } else if (tmp == '.') {
-            draw_sprite_now(tmp_x, tmp_y, 4, 5, 104, 61, VRAM_FONTS_BANK);
+            draw_sprite_now(tmp_x, tmp_y, 2, 5, 107, 61, VRAM_FONTS_BANK);
         } else if (tmp == '\'') {
             draw_sprite_now(tmp_x, tmp_y, 4, 5, 116, 61, VRAM_FONTS_BANK);
         } else if (tmp == '"') {
@@ -201,9 +216,6 @@ void print_line() {
     tmp_x = 2;
     tmp_y += 6;
 }
-
-const char *yes_str = "Yes";
-const char *no_str = "No";
 
 void fill_dialog(char *title, char *content, char yes_no) {
 /*    if (yes_no) {
@@ -244,19 +256,19 @@ unsigned char dialog(const char *title, const char *content, char yes_no) {
     sleep(1);
     flip_pages();
     if (yes_no) {
-        tmp3 = 0;
+        dialog_selection = 0;
         while (1) {
             update_inputs();
             if (player1_buttons & ~player1_old_buttons & INPUT_MASK_LEFT) {
-                tmp3 = 0;
+                dialog_selection = 0;
             }
             if (player1_buttons & ~player1_old_buttons & INPUT_MASK_RIGHT) {
-                tmp3 = 1;
+                dialog_selection = 1;
             }
             if (player1_buttons & ~player1_old_buttons & INPUT_MASK_B) break;
-            if (player1_buttons & ~player1_old_buttons & INPUT_MASK_A) return tmp3;
+            if (player1_buttons & ~player1_old_buttons & INPUT_MASK_A) return dialog_selection;
 
-            if (tmp3) {
+            if (dialog_selection) {
                 draw_box_now(28, 78, 18, 15, 0);
                 draw_box_now(78, 78, 23, 15, 188);
             } else {
@@ -298,6 +310,8 @@ const char *armors_female_name[5] = {
     "Full plate"
 };
 
+int armors_price[5] = { 50, 200, 500, 1000, 2000 };
+
 const char *armors_female_desc[5] = {
     "50 coin\n\nThe basic armor.",
     "200 coin\n\nReinforced for enhanced\nprotection.",
@@ -333,10 +347,28 @@ void display_armor(unsigned char idx) {
     tmp_y = 80;
     print_line();
     await_drawing();
+
+    if (armors_price[idx] <= attr_gp && attr_armor < idx+1) {
+        if (dialog_selection) {
+            draw_box_now(90, 74, 25, 11, 188);
+        } else {
+            draw_box_now(60, 74, 20, 11, 188);
+        }
+        await_drawing();
+        tmp_x = 60;
+        tmp_y = 74;
+        tmp_tilemap_ptr = (unsigned char *)pass_str;
+        print_line();
+        tmp_x = 90;
+        tmp_y = 74;
+        tmp_tilemap_ptr = (unsigned char *)buy_str;
+        print_line();
+    }
 }
 
 void shop_armors() {
     tile_val = 0;
+    dialog_selection = 0;
 
     while (1) {
         clear_screen(0);
@@ -355,11 +387,25 @@ void shop_armors() {
         if (player1_buttons & ~player1_old_buttons& INPUT_MASK_UP) {
             if (tile_val != 0) {
                 tile_val--;
+                dialog_selection = 0;
             }
         } else if (player1_buttons & ~player1_old_buttons & INPUT_MASK_DOWN) {
             if (tile_val != 4) {
                 tile_val++;
+                dialog_selection = 0;
             }
+        } else if (player1_buttons & ~player1_old_buttons & INPUT_MASK_RIGHT) {
+            dialog_selection = 1;
+        } else if (player1_buttons & ~player1_old_buttons & INPUT_MASK_LEFT) {
+            dialog_selection = 0;
+        } else if (player1_buttons & ~player1_old_buttons & INPUT_MASK_A) {
+            long_val1 = armors_price[tile_val];
+            if (dialog_selection && long_val1 <= attr_gp) {
+                attr_gp -= long_val1;
+                attr_armor = tile_val+1;
+                recompute_dashboard();
+            }
+            dialog_selection = 0;
         }
         if (player1_buttons & INPUT_MASK_B) break;
     }
@@ -376,6 +422,8 @@ const char *weapon_name[5] = {
     "Great sword"
 };
 
+int weapon_price[5] = { 50, 200, 500, 1000, 2000 };
+
 const char *weapon_desc[5] = {
     "50 coin\n\nTe hee it's\nso tiny.",
     "200 coin\n\nGoes crunch.",
@@ -390,7 +438,7 @@ void display_weapon_names() {
     for (tmp3=0; tmp3<5; tmp3++) {
         tmp_x = 2;
 //        tmp_y += 6;
-        tmp_tilemap_ptr = weapon_name[tmp3];
+        tmp_tilemap_ptr = (unsigned char *)weapon_name[tmp3];
         print_line();
     }
     await_drawing();
@@ -399,13 +447,30 @@ void display_weapon_names() {
 void display_weapon(unsigned char idx) {
     tmp_x = 4;
     tmp_y = 80;
-    tmp_tilemap_ptr = weapon_desc[idx];
+    tmp_tilemap_ptr = (unsigned char *)weapon_desc[idx];
     print_line();
     await_drawing();
+    if (weapon_price[idx] <= attr_gp && attr_weapon < idx+1) {
+        if (dialog_selection) {
+            draw_box_now(90, 74, 25, 11, 188);
+        } else {
+            draw_box_now(60, 74, 20, 11, 188);
+        }
+        await_drawing();
+        tmp_x = 60;
+        tmp_y = 74;
+        tmp_tilemap_ptr = (unsigned char *)pass_str;
+        print_line();
+        tmp_x = 90;
+        tmp_y = 74;
+        tmp_tilemap_ptr = (unsigned char *)buy_str;
+        print_line();
+    }
 }
 
 void shop_weapons() {
-        tile_val = 0;
+    tile_val = 0;
+    dialog_selection = 0;
 
     while (1) {
         clear_screen(0);
@@ -424,11 +489,25 @@ void shop_weapons() {
         if (player1_buttons & ~player1_old_buttons& INPUT_MASK_UP) {
             if (tile_val != 0) {
                 tile_val--;
+                dialog_selection = 0;
             }
         } else if (player1_buttons & ~player1_old_buttons & INPUT_MASK_DOWN) {
             if (tile_val != 4) {
                 tile_val++;
+                dialog_selection = 0;
             }
+        } else if (player1_buttons & ~player1_old_buttons & INPUT_MASK_RIGHT) {
+            dialog_selection = 1;
+        } else if (player1_buttons & ~player1_old_buttons & INPUT_MASK_LEFT) {
+            dialog_selection = 0;
+        } else if (player1_buttons & ~player1_old_buttons & INPUT_MASK_A) {
+            long_val1 = weapon_price[tile_val];
+            if (dialog_selection && long_val1 <= attr_gp) {
+                attr_gp -= long_val1;
+                attr_armor = tile_val+1;
+                recompute_dashboard();
+            }
+            dialog_selection = 0;
         }
         if (player1_buttons & INPUT_MASK_B) break;
     }
