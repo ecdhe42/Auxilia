@@ -9,6 +9,7 @@ void recompute_dashboard();
 void monster_action();
 void attack_monster();
 void main_loop();
+void draw_map();
 
 #pragma data-name (push, "SAVE")
 #pragma data-name (pop)
@@ -25,6 +26,7 @@ unsigned char player_step;
 unsigned char x_tile, y_tile;
 unsigned char *tilemap_ptr;
 unsigned char *tmp_tilemap_ptr;
+unsigned char *tmp_ptr;
 unsigned char *player_ptr;
 unsigned char tilemap_x;
 unsigned char tilemap_y;
@@ -54,6 +56,7 @@ unsigned char attr_xp_digits[4];
 unsigned char attr_gp_digits[4];
 unsigned char attr_mana_digits[4];
 unsigned char attr_level_digits[2];
+
 #pragma bss-name (pop)
 
 #pragma data-name (push, "DATA")
@@ -89,6 +92,7 @@ unsigned char tileset_property[64];
 unsigned char *world_tilemap_ptr;
 unsigned char world_tilemap_x;
 unsigned char world_tilemap_y;
+unsigned char known_land[2048];
 
 const unsigned char visibility_scan[64] = {
     31,    21,22,23,   30,32,   39,40,41,
@@ -141,7 +145,7 @@ struct Monster monsters_world[NB_MONSTERS];
 struct Monster monsters_dungeon[NB_MONSTERS];
 
 const struct Map maps[4] = {
-    {0x22A4, 0x24, 0x44, VRAM_WORLD_TILESET_BANK, WORLD_TILEMAP_BANK, world_tileset_property},  // World
+    {0x22A4, 0x24, 0x45, VRAM_WORLD_TILESET_BANK, WORLD_TILEMAP_BANK, world_tileset_property},  // World
     {0x1B9B, 0x1B, 0x37, VRAM_CITY_TILESET_BANK, CITY_TILEMAP_BANK, city_tileset_property},     // Castle
     {0xD42, 66, 26, VRAM_CITY_TILESET_BANK, CITY_TILEMAP_BANK, city_tileset_property},          // Sunglow
     {0xB9C, 28, 23, VRAM_CITY_TILESET_BANK, DUNGEON_TILEMAP_BANK, city_tileset_property}        // Dungeon
@@ -152,6 +156,10 @@ struct TileVisibility {
     unsigned char otherTile2;
     unsigned char otherTile3;
 };
+
+unsigned char visible_view1[35] = {255, 11,12,14,20,24,38,48,50,    1,2,4,5,7,10,16,28,34,37,43,55,56,58,59,61,                     0,8,9,17,27,35,36,44,45,53};
+unsigned char visible_view2[35] = {255, 12,13,15,29,33,47,49,51,  255,3,255,6,255,19,25,255,255,46,52,255,57,255,60,255,            9,17,18,26,255,255,45,53,54,62};
+unsigned char visible_view3[35] = {255, 20,14,24,38,42,48,50,42,  255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,  255,255,255,255,255,255,255,255,255,255};
 
 const struct TileVisibility visible_view[35] = {
     {255, 255, 255},
@@ -202,7 +210,6 @@ void breakpoint() {}
 
 void set_map(unsigned char map_idx) {
     struct Map *map = (struct Map *)&maps[map_idx];
-    breakpoint();
     // If we're leaving the world map, save the state (player position, monsters)
     if (map_id == 0) {
         for (tmp=0; tmp<NB_MONSTERS; tmp++) {
@@ -255,33 +262,43 @@ void set_map(unsigned char map_idx) {
     }
 }
 
+const unsigned char mask1[8] = { 0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01 };
+const unsigned char mask2[8] = { 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE, 0xF8 };
+const unsigned char mask_visible[26] = { 0,0,0,0,0,0,0,0, 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01, 0,0,0,0,0,0,0,0,0 };
+
+unsigned char visible_bitfield1[7];
+unsigned char visible_bitfield2[7];
+
 /*
 Sets the visible tiles, not showing hidden tiles
 Tiles with the top bit on means there is a monster
 */
 void set_visible_tiles() {
+    // Clear all the tiles from the visibility window
     for (tmp=0;tmp<64;tmp++) {
         visible[tmp]=52;
     }
+    // Draw the 9 tiles on and around the player
     for (tmp=0;tmp<9;tmp++) {
-        tmp2 = visibility_scan[tmp];
-        long_tmp = tilemap_scan[tmp];
+        tmp2 = visibility_scan[tmp];    // tmp2: offset inside the visibility window
+        long_tmp = tilemap_scan[tmp];   // long_tmp: offset inside the tilemap
         visible[tmp2] = tilemap_ptr[long_tmp];
     }
+    // Circle around the player, drawing tiles if need be
     for (tmp=1; tmp<35; tmp++) {
         tmp2 = visibility_scan[tmp];
         long_tmp = tilemap_scan[tmp];
         tile_val = tilemap_ptr[long_tmp];
         tile_val2 = tileset_property[tile_val];
         if ((tile_val2 & 0x2) && visible[tmp2] != 52) {
-            tile_vis = (struct TileVisibility *)&visible_view[tmp];
-            tmp2 = tile_vis->otherTile1;
+//            tile_vis = (struct TileVisibility *)&visible_view[tmp];
+            tmp2 = visible_view1[tmp];
             long_tmp = screen_to_tilemap[tmp2];
             if (tmp2 != 255) visible[tmp2] = tilemap_ptr[long_tmp];
-            tmp2 = tile_vis->otherTile2;
+            tmp2 = visible_view2[tmp];
             long_tmp = screen_to_tilemap[tmp2];
             if (tmp2 != 255) visible[tmp2] = tilemap_ptr[long_tmp];
-            tmp2 = tile_vis->otherTile3;
+            tmp2 = visible_view3[tmp];
             long_tmp = screen_to_tilemap[tmp2];
             if (tmp2 != 255) visible[tmp2] = tilemap_ptr[long_tmp];
         }
@@ -302,6 +319,49 @@ void set_visible_tiles() {
         } else {
             monster_tile_idx[tmp] &= 0x7F;
         }
+    }
+
+    if (map_id != 0) return;
+
+    // Build visible_bitfield. This is used for the map. For example, if visible is:
+    //       . X . . . . . . .
+    //       . . X X X X . . .
+    //       X X X X X X . . .
+    // 0 0 0 1 1 1 1 1|1 0 0 0 0 0 0 0
+    // And the visible map starts at X offset 3, then we build the following bytes:
+    // 00001000  0000000
+    // 00000111  1000000
+    // 00011111  1000000
+    tmp3 = 0;                           // Offset inside the visible 9x7 table
+    tile_val = 0;                       // Offset inside the visible bitfield
+    tmp_x = (tilemap_x &7) + 8;       // Number of bits to shift
+    tmp_y = (tilemap_x &7);
+    for (tmp2=0; tmp2<7; tmp2++) {
+        visible_bitfield1[tile_val] = 0;
+        visible_bitfield2[tile_val] = 0;
+        for (tmp=0;tmp<9;tmp++) {
+            if (visible[tmp3++] != 52) {
+                visible_bitfield1[tile_val] |= mask_visible[tmp+tmp_x];
+                visible_bitfield2[tile_val] |= mask_visible[tmp+tmp_y];
+            };
+        }
+        tile_val++;
+    }
+
+    // Flip the bits inside the known_land table for each tile visible to the player
+    tmp = tilemap_x & 0x7;
+    tmp_tilemap_ptr = (unsigned char *)known_land + (tilemap_x >> 3) + (tilemap_y << 4);
+    breakpoint();
+    tile_val = 0;
+    for (tmp3=0; tmp3<7; tmp3++) {
+        tmp_x = visible_bitfield1[tile_val];
+        tmp2 = *tmp_tilemap_ptr | (mask1[tmp] & tmp_x);
+        *tmp_tilemap_ptr = tmp2;
+        tmp_tilemap_ptr++;
+        tmp_x = visible_bitfield2[tile_val++];
+        tmp2 = *tmp_tilemap_ptr | (mask2[tmp] & tmp_x);
+        *tmp_tilemap_ptr = tmp2;
+        tmp_tilemap_ptr += 15;
     }
 }
 
@@ -327,7 +387,6 @@ void interact(unsigned char tile) {
             set_map(0);
             return;
         }
-
         interact_castle(tile);
     } else if (map_id == 2) {
         // We leave the city
@@ -341,6 +400,89 @@ void interact(unsigned char tile) {
         set_map(0);
         return;
     }
+}
+
+const unsigned char map2color[64] = {
+    20, 20, 20, 20, 19, 19, 19, 61,
+    94, 94, 94, 75, 76, 74, 19,  0,
+    94, 61, 94,212,212,212,212,  0,
+    94, 94, 94,  0,  0,  0, 61, 61,
+    0 ,  0,  0,  0,  0,  0, 61, 61,
+    0 ,  0,  0,  0,  0, 94, 94, 94,
+    0 ,  0,  0,  0,  0, 94,  0, 94,
+    0 , 76,  0,  0,  0, 94, 94, 94
+};
+
+void draw_map() {
+    change_rom_bank(WORLD_TILEMAP_BANK);
+
+    tmp2 = 0;
+    while (1) {
+        flagsMirror |= DMA_CPU_TO_VRAM;
+        flagsMirror &= ~DMA_ENABLE;
+        *dma_flags = flagsMirror;
+        long_val1 = 0;
+        tmp_tilemap_ptr = (unsigned char *)0x8000;
+        tmp_ptr = (unsigned char *)known_land;
+        while (long_val1 != 0x4000) {
+            tmp = *tmp_ptr;
+ 
+            tmp3 = tmp & 0x80 ? map2color[*tmp_tilemap_ptr] : 0;
+            vram[long_val1] = tmp3;
+            tmp_tilemap_ptr++;
+            long_val1++;
+
+            tmp3 = tmp & 0x40 ? map2color[*tmp_tilemap_ptr] : 0;
+            vram[long_val1] = tmp3;
+            tmp_tilemap_ptr++;
+            long_val1++;
+
+            tmp3 = tmp & 0x20 ? map2color[*tmp_tilemap_ptr] : 0;
+            vram[long_val1] = tmp3;
+            tmp_tilemap_ptr++;
+            long_val1++;
+
+            tmp3 = tmp & 0x10 ? map2color[*tmp_tilemap_ptr] : 0;
+            vram[long_val1] = tmp3;
+            tmp_tilemap_ptr++;
+            long_val1++;
+
+            tmp3 = tmp & 0x8 ? map2color[*tmp_tilemap_ptr] : 0;
+            vram[long_val1] = tmp3;
+            tmp_tilemap_ptr++;
+            long_val1++;
+
+            tmp3 = tmp & 0x4 ? map2color[*tmp_tilemap_ptr] : 0;
+            vram[long_val1] = tmp3;
+            tmp_tilemap_ptr++;
+            long_val1++;
+
+            tmp3 = tmp & 0x2 ? map2color[*tmp_tilemap_ptr] : 0;
+            vram[long_val1] = tmp3;
+            tmp_tilemap_ptr++;
+            long_val1++;
+
+            tmp3 = tmp & 0x1 ? map2color[*tmp_tilemap_ptr] : 0;
+            vram[long_val1] = tmp3;
+            tmp_tilemap_ptr++;
+            long_val1++;
+
+            tmp_ptr++;
+        }
+
+        vram[(int)player_ptr-0x8000] = (tmp2 & 1) ? 124 : 0;
+        tmp2++;
+
+        PROFILER_END(0);
+        sleep(1);
+        flip_pages();
+        PROFILER_START(0);
+
+        update_inputs();
+        if (player1_buttons & ~player1_old_buttons & INPUT_MASK_B) break;
+    }
+
+    change_rom_bank(MISC_CODE_BANK);
 }
 
 int main () {

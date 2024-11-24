@@ -3,6 +3,7 @@
 void interact(unsigned char tile);
 void set_visible_tiles();
 void recompute_dashboard();
+void draw_map();
 
 extern unsigned char tmp, tmp2, tmp3, tmp_x, tmp_y, tile_val;
 extern unsigned char *tilemap_ptr;
@@ -52,6 +53,7 @@ extern unsigned char world_tilemap_x;
 extern unsigned char world_tilemap_y;
 extern const struct Map maps[3];
 extern unsigned char tileset_property[64];
+extern unsigned char known_land[2048];
 
 const struct Monster available_monsters[1] = {
     { 24, 0, 0, 0, 0, 0, 10, 10, 10, 2 }
@@ -155,6 +157,10 @@ void init_game() {
     attr_mana_digits[1] = 0;
     attr_mana_digits[2] = 0;
     attr_mana_digits[3] = 0;
+
+    for (long_val1=0; long_val1<2048; long_val1++) {
+        known_land[long_val1] = 0;
+    }
 }
 
 void restore_dashboard() {
@@ -208,7 +214,6 @@ void print_line() {
             draw_sprite_now(tmp_x, tmp_y, 4, 5, 0, 66, VRAM_FONTS_BANK);
         }
 
-        breakpoint();
         tmp_tilemap_ptr++;
         tmp_x += 5;
         tmp = tmp_tilemap_ptr[0];
@@ -434,7 +439,6 @@ const char *weapon_desc[5] = {
 
 void display_weapon_names() {
     tmp_y = 5;
-    breakpoint();
     for (tmp3=0; tmp3<5; tmp3++) {
         tmp_x = 2;
 //        tmp_y += 6;
@@ -823,6 +827,9 @@ void main_loop() {
             // If we're about to step an an automatic actionable tile
             } else if (tmp2 & 0x8) {
                 interact(tmp);
+            } else if (player1_buttons & ~player1_old_buttons & INPUT_MASK_B) {
+                draw_map();
+                restore_dashboard();
             }
 
             // Monster movement (world only)
